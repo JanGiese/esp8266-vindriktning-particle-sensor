@@ -26,7 +26,7 @@ uint32_t lastMqttConnectionAttempt = 0;
 const uint16_t mqttConnectionInterval = 60000; // 1 minute = 60 seconds = 60000 milliseconds
 
 uint32_t statusPublishPreviousMillis = 0;
-const uint16_t statusPublishInterval = 30000; // 30 seconds = 30000 milliseconds
+const uint16_t statusPublishInterval = 5000;//30000; // 30 seconds = 30000 milliseconds
 
 char identifier[24];
 #define FIRMWARE_PREFIX "esp8266-vindriktning-particle-sensor"
@@ -48,6 +48,7 @@ void saveConfigCallback() {
 void setup() {
     Serial.begin(115200);
     SerialCom::setup();
+    pinMode(LED_BUILTIN, OUTPUT);
 
     Serial.println("\n");
     Serial.println("Hello from esp8266-vindriktning-particle-sensor");
@@ -115,7 +116,26 @@ void setupOTA() {
     ArduinoOTA.begin();
 }
 
+unsigned long blinkDurationMillis = 2000;
+unsigned long lastBlinkMillis = 0;
+bool blinkHigh = false;
+void handleLed() {
+  unsigned long currentMillis = millis();
+    if (currentMillis - lastBlinkMillis >= blinkDurationMillis) {
+      lastBlinkMillis = currentMillis;
+      if (blinkHigh) {
+        digitalWrite(LED_BUILTIN, HIGH);
+        //  Logger.println("LED is on");
+      } else {
+        digitalWrite(LED_BUILTIN, LOW);
+        // Logger.println("LED is off");
+      }
+      blinkHigh = !blinkHigh;
+    }
+}
+
 void loop() {
+    handleLed();
     ArduinoOTA.handle();
     SerialCom::handleUart(state);
     mqttClient.loop();
@@ -124,10 +144,10 @@ void loop() {
     if (currentMillis - statusPublishPreviousMillis >= statusPublishInterval) {
         statusPublishPreviousMillis = currentMillis;
 
-        if (state.valid) {
-            printf("Publish state\n");
-            publishState();
-        }
+        //if (state.valid) {
+        printf("Publish state\n");
+        publishState();
+        //}
     }
 
     if (!mqttClient.connected() && currentMillis - lastMqttConnectionAttempt >= mqttConnectionInterval) {
