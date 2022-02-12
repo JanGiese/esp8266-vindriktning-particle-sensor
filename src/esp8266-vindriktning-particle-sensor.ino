@@ -6,9 +6,12 @@
 #include <PubSubClient.h>
 #include <WiFiManager.h>
 
+
 #include "Config.h"
 #include "SerialCom.h"
 #include "Types.h"
+
+#include "MqttLogger.h"
 
 particleSensorState_t state;
 
@@ -26,7 +29,7 @@ uint32_t lastMqttConnectionAttempt = 0;
 const uint16_t mqttConnectionInterval = 60000; // 1 minute = 60 seconds = 60000 milliseconds
 
 uint32_t statusPublishPreviousMillis = 0;
-const uint16_t statusPublishInterval = 5000;//30000; // 30 seconds = 30000 milliseconds
+const uint16_t statusPublishInterval = 30000; // 30 seconds = 30000 milliseconds
 
 char identifier[24];
 #define FIRMWARE_PREFIX "esp8266-vindriktning-particle-sensor"
@@ -45,13 +48,17 @@ void saveConfigCallback() {
     shouldSaveConfig = true;
 }
 
+
+MqttLogger Logger(&mqttClient, "log/esp8266-vindriktning-particle-sensor");
+
+
 void setup() {
     Serial.begin(115200);
     SerialCom::setup();
     pinMode(LED_BUILTIN, OUTPUT);
 
-    Serial.println("\n");
-    Serial.println("Hello from esp8266-vindriktning-particle-sensor");
+    Logger.println("\n");
+    Logger.println("Hello from esp8266-vindriktning-particle-sensor");
     Serial.printf("Core Version: %s\n", ESP.getCoreVersion().c_str());
     Serial.printf("Boot Version: %u\n", ESP.getBootVersion());
     Serial.printf("Boot Mode: %u\n", ESP.getBootMode());
@@ -79,10 +86,13 @@ void setup() {
     mqttClient.setBufferSize(2048);
     mqttClient.setCallback(mqttCallback);
 
+    std::format(Logger.LOG_TOPIC, 127, "log/%s", identifier);
+    Logger.startMqttLog();
+
     Serial.printf("Hostname: %s\n", identifier);
     Serial.printf("IP: %s\n", WiFi.localIP().toString().c_str());
 
-    Serial.println("-- Current GPIO Configuration --");
+    Logger.println("-- Current GPIO Configuration --");
     Serial.printf("PIN_UART_RX: %d\n", SerialCom::PIN_UART_RX);
 
     mqttReconnect();
@@ -145,14 +155,14 @@ void loop() {
         statusPublishPreviousMillis = currentMillis;
 
         //if (state.valid) {
-        printf("Publish state\n");
+        Logger.println("Publish state");
         publishState();
         //}
     }
 
     if (!mqttClient.connected() && currentMillis - lastMqttConnectionAttempt >= mqttConnectionInterval) {
         lastMqttConnectionAttempt = currentMillis;
-        printf("Reconnect mqtt\n");
+        Logger.println("Reconnect mqtt");
         mqttReconnect();
     }
 }
